@@ -81,7 +81,7 @@ public class FileProcessingService {
 
             dto.setSpecialties(List.of(specialtyDto));
 
-            dto.setIntakeSource(Provider.IntakeSource.FILE_UPLOAD.getLabel());
+            dto.setIntakeSource(Provider.IntakeSource.FILE_UPLOAD.name());
 
             result.add(dto);
         }
@@ -136,7 +136,7 @@ public class FileProcessingService {
 
             dto.setSpecialties(List.of(specialtyDto));
 
-            dto.setIntakeSource(Provider.IntakeSource.FILE_UPLOAD.getLabel());
+            dto.setIntakeSource(Provider.IntakeSource.FILE_UPLOAD.name());
 
             return dto;
         } catch (Exception e) {

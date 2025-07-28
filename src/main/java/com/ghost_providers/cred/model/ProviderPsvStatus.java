@@ -2,8 +2,7 @@ package com.ghost_providers.cred.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
-import java.time.LocalDateTime;
+import lombok.Getter;
 
 @Entity
 @Table(name = "provider_psv_status")
@@ -39,12 +38,25 @@ public class ProviderPsvStatus {
     @Enumerated(EnumType.STRING)
     private OverallStatus overallStatus;
 
+    @Getter
     public enum VerificationStatus {
-        VERIFIED, PENDING, FAILED, NOT_STARTED
+        VERIFIED("verified"), PENDING("pending"), FAILED("failed"), NOT_STARTED("not-started");
+
+        private final String label;
+
+        VerificationStatus(String label) {
+            this.label = label;
+        }
     }
 
+    @Getter
     public enum OverallStatus {
-        NOT_STARTED, IN_PROGRESS, COMPLETED, ISSUES_FOUND
+        NOT_STARTED("not-started"), IN_PROGRESS("in-progress"), COMPLETED("completed"), ISSUES_FOUND("issues-found");
+        private final String label;
+
+        OverallStatus(String label) {
+            this.label = label;
+        }
     }
 
     @PrePersist

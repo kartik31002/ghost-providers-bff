@@ -51,6 +51,9 @@ public class ProviderMapper {
             cred.setNpi(provider.getCredentials().getNpi());
             cred.setTin(provider.getCredentials().getTin());
             cred.setDeaNumber(provider.getCredentials().getDeaNumber());
+            cred.setCaqhId(provider.getCredentials().getCaqhId());
+            cred.setMedicaidId(provider.getCredentials().getMedicaidId());
+            cred.setMedicareId(provider.getCredentials().getMedicareId());
 
 
             cred.setStateLicenses(
@@ -80,13 +83,13 @@ public class ProviderMapper {
 
         // PSV Status
         PsvStatusDto psv = new PsvStatusDto();
-        psv.setLicenses(provider.getPsvStatus().getLicenses().name());
-        psv.setDeaNpi(provider.getPsvStatus().getDeaNpi().name());
-        psv.setEducation(provider.getPsvStatus().getEducation().name());
-        psv.setMalpractice(provider.getPsvStatus().getMalpractice().name());
-        psv.setWorkHistory(provider.getPsvStatus().getWorkHistory().name());
-        psv.setSanctions(provider.getPsvStatus().getSanctions().name());
-        psv.setOverallStatus(provider.getPsvStatus().getOverallStatus().name());
+        psv.setLicenses(provider.getPsvStatus().getLicenses().getLabel());
+        psv.setDeaNpi(provider.getPsvStatus().getDeaNpi().getLabel());
+        psv.setEducation(provider.getPsvStatus().getEducation().getLabel());
+        psv.setMalpractice(provider.getPsvStatus().getMalpractice().getLabel());
+        psv.setWorkHistory(provider.getPsvStatus().getWorkHistory().getLabel());
+        psv.setSanctions(provider.getPsvStatus().getSanctions().getLabel());
+        psv.setOverallStatus(provider.getPsvStatus().getOverallStatus().getLabel());
         dto.setPsvStatus(psv);
 
         // Validation Errors

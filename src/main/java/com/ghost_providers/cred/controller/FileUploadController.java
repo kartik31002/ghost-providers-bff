@@ -1,9 +1,13 @@
 package com.ghost_providers.cred.controller;
 
-import com.ghost_providers.cred.dto.ProviderDTO;
 import com.ghost_providers.cred.dto.ProviderIntakeRequest;
 import com.ghost_providers.cred.model.FileDocument;
+import com.ghost_providers.cred.model.Provider;
+import com.ghost_providers.cred.model.ProviderDocument;
 import com.ghost_providers.cred.repository.FileDocumentRepository;
+import com.ghost_providers.cred.repository.ProviderDocumentRepository;
+import com.ghost_providers.cred.repository.ProviderRepository;
+import com.ghost_providers.cred.service.DocumentProcessingService;
 import com.ghost_providers.cred.service.FileProcessingService;
 import com.ghost_providers.cred.service.ProviderIntakeService;
 import lombok.RequiredArgsConstructor;
@@ -13,14 +17,16 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 @RestController
 @RequestMapping("/api/files")
@@ -31,6 +37,9 @@ public class FileUploadController {
     private final FileProcessingService fileProcessingService;
 
     private final ProviderIntakeService providerIntakeService;
+    private final ProviderRepository providerRepository;
+    private final ProviderDocumentRepository providerDocumentRepository;
+    private final DocumentProcessingService documentProcessingService;
 
     private final String uploadDir = System.getProperty("user.home") + "/uploaded-files";
 
@@ -52,6 +61,40 @@ public class FileUploadController {
             doc.setStatus(FileDocument.FileStatus.NEW);
             doc.setProvidersFound(0);
             repository.save(doc);
+
+            return ResponseEntity.ok(Map.of("message", "File uploaded", "id", doc.getId()));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Upload failed"));
+        }
+    }
+
+    @PostMapping("/upload/{id}")
+    public ResponseEntity<?> uploadProviderDocument(@RequestParam("file") MultipartFile file, @PathVariable Long id) {
+        try {
+            File directory = new File(uploadDir);
+            if (!directory.exists()) directory.mkdirs();
+
+            String uniqueName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            Path path = Paths.get(uploadDir, uniqueName);
+            Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+
+            Optional<Provider> optionalProvider = providerRepository.findById(id);
+            if(optionalProvider.isEmpty()){
+                return ResponseEntity.ok(Map.of("message", "Provider does not exist", "id", id));
+            }
+            String type = file.getOriginalFilename().endsWith(".pdf") ?
+                    "PDF" : file.getOriginalFilename().endsWith(".zip") ?
+                    "ZIP" : null;
+
+            if(type == null) {
+                return ResponseEntity.ok(Map.of("message", "Invalid file type", "id", id));
+            }
+
+            ProviderDocument doc = new ProviderDocument();
+            doc.setProvider(optionalProvider.get());
+            doc.setType(type);
+            doc.setFilename(uniqueName);
+            providerDocumentRepository.save(doc);
 
             return ResponseEntity.ok(Map.of("message", "File uploaded", "id", doc.getId()));
         } catch (IOException e) {
@@ -84,47 +127,84 @@ public class FileUploadController {
     }
 
     @PostMapping("/upload/providers")
-    public ResponseEntity<?> uploadProviderFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadProviderZip(@RequestParam("file") MultipartFile zipFile) {
         try {
-            // 1. Ensure upload directory exists
-            File directory = new File(uploadDir);
-            if (!directory.exists()) directory.mkdirs();
-
-            // 2. Save file to disk
-            String uniqueName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-            Path path = Paths.get(uploadDir, uniqueName);
-            Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
-
-            // 3. Save FileDocument entry
-            FileDocument doc = new FileDocument();
-            doc.setFileName(file.getOriginalFilename());
-            doc.setFileSize(Files.size(path)); // more reliable
-            doc.setFileType(file.getContentType());
-            doc.setFilePath(path.toString());
-            doc.setStatus(FileDocument.FileStatus.NEW);
-            doc.setProvidersFound(0);
-            repository.save(doc);
-
-            String filename = file.getOriginalFilename();
-            List<ProviderIntakeRequest> providers;
-
-            if (filename.endsWith(".csv")) {
-                providers = fileProcessingService.parseCsv(file.getInputStream());
-            } else if (filename.endsWith(".xls") || filename.endsWith(".xlsx")) {
-                providers = fileProcessingService.parseExcel(file.getInputStream());
-            } else {
-                return ResponseEntity.badRequest().body("Unsupported file type.");
+            if (!zipFile.getOriginalFilename().endsWith(".zip")) {
+                return ResponseEntity.badRequest().body("Only ZIP files are supported.");
             }
-            // Save each provider
-            providers.forEach(providerIntakeService::createProvider);
-            doc.setProvidersFound(providers.size());
+
+            // 1. Save the ZIP file
+            File uploadDirectory = new File(uploadDir);
+            if (!uploadDirectory.exists()) uploadDirectory.mkdirs();
+
+            String uniqueZipName = UUID.randomUUID() + "_" + zipFile.getOriginalFilename();
+            Path zipPath = Paths.get(uploadDir, uniqueZipName);
+            Files.copy(zipFile.getInputStream(), zipPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 2. Extract ZIP
+            File extractDir = Files.createTempDirectory("unzipped_").toFile();
+            try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    File newFile = new File(extractDir, entry.getName());
+                    try (FileOutputStream fos = new FileOutputStream(newFile)) {
+                        zis.transferTo(fos);
+                    }
+                }
+            }
+
+            // 3. Identify the files inside ZIP
+            File[] extractedFiles = extractDir.listFiles();
+            if (extractedFiles == null || extractedFiles.length < 4)
+                return ResponseEntity.badRequest().body("ZIP must contain at least 1 CSV and 3 PDFs.");
+
+            File csvFile = Arrays.stream(extractedFiles)
+                    .filter(f -> f.getName().endsWith(".csv"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("CSV file not found in ZIP"));
+
+            File licensePdf = findFileByKeyword(extractedFiles, "license");
+            File insurancePdf = findFileByKeyword(extractedFiles, "insurance");
+            File workHistoryPdf = findFileByKeyword(extractedFiles, "work");
+
+            // 4. Parse provider data from CSV
+            List<ProviderIntakeRequest> providers = fileProcessingService.parseCsv(new FileInputStream(csvFile));
+
+            // 5. Save each provider
+            Long providerId = null;
+            for (ProviderIntakeRequest provider : providers) {
+                providerId = providerIntakeService.createProvider(provider);
+            }
+
+            // 6. Save FileDocument entry
+            FileDocument doc = new FileDocument();
+            doc.setFileName(zipFile.getOriginalFilename());
+            doc.setFileSize(Files.size(zipPath));
+            doc.setFileType(zipFile.getContentType());
+            doc.setFilePath(zipPath.toString());
             doc.setStatus(FileDocument.FileStatus.NEW);
+            doc.setProvidersFound(providers.size());
             repository.save(doc);
 
-            return ResponseEntity.ok(Map.of("message", "Imported " + providers.size() + " providers"));
+            // 7. OPTIONAL: Send PDF content to external API
+            documentProcessingService.extractAndSave(licensePdf, insurancePdf, workHistoryPdf, providerId);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Processed " + providers.size() + " providers from ZIP",
+                    "fileId", doc.getId()
+            ));
+
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to parse file", "details", e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("error", "ZIP processing failed", "details", e.getMessage()));
         }
     }
+
+    private File findFileByKeyword(File[] files, String keyword) {
+        return Arrays.stream(files)
+                .filter(f -> f.getName().toLowerCase().contains(keyword.toLowerCase()) && f.getName().endsWith(".pdf"))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Missing PDF file with keyword: " + keyword));
+    }
+
 
 }

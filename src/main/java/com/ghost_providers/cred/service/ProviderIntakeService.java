@@ -9,6 +9,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class ProviderIntakeService {
@@ -31,6 +33,8 @@ public class ProviderIntakeService {
         provider.setPhone(request.getPhone());
 
         provider.setStatus(Provider.Status.NEW); // Default
+        provider.setCreatedAt(LocalDateTime.now()); // Default
+        provider.setUpdatedAt(LocalDateTime.now()); // Default
         provider.setIntakeSource(Provider.IntakeSource.valueOf(request.getIntakeSource())); //Default
         Provider saved = providerRepository.save(provider);
 
@@ -49,6 +53,7 @@ public class ProviderIntakeService {
             cred.setProvider(saved);
             cred.setNpi(request.getCredentials().getNpi());
             cred.setTin(request.getCredentials().getTin());
+            cred.setDeaNumber(request.getCredentials().getDeaNumber());
             credentialRepository.save(cred);
         }
 

@@ -27,7 +27,7 @@ public class ProviderMapper {
         if(provider.getDemographics()!=null) {
             DemographicsDto demo = new DemographicsDto();
             demo.setDateOfBirth(provider.getDemographics().getDateOfBirth());
-            demo.setGender(provider.getDemographics().getGender().name());
+            demo.setGender(provider.getDemographics().getGender().getLabel());
             demo.setSsn(provider.getDemographics().getSsn());
             dto.setDemographics(demo);
         }
@@ -62,7 +62,7 @@ public class ProviderMapper {
                         l.setState(license.getState());
                         l.setLicenseNumber(license.getLicenseNumber());
                         l.setExpirationDate(license.getExpirationDate());
-                        l.setStatus(license.getStatus().name());
+                        l.setStatus(license.getStatus().getLabel());
                         return l;
                     }).collect(Collectors.toList())
             );

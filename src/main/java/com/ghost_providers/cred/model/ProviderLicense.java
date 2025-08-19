@@ -29,15 +29,21 @@ public class ProviderLicense {
 
     @Getter
     public enum LicenseStatus {
-        ACTIVE("Active"),
-        EXPIRED("Expired"),
-        SUSPENDED("Suspended"),
-        PENDING("Pending");
+        ACTIVE("active"),
+        EXPIRED("expired"),
+        SUSPENDED("suspended"),
+        PENDING("pending");
 
         private final String label;
 
         LicenseStatus(String label) {
             this.label = label;
         }
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        this.expirationDate = LocalDate.from(LocalDateTime.now().plusMonths(1));
+        this.status = LicenseStatus.ACTIVE;
     }
 }

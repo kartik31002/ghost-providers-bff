@@ -61,13 +61,13 @@ public class ProviderPsvStatus {
 
     @PrePersist
     protected void onCreate() {
-        this.licenses = VerificationStatus.NOT_STARTED;
-        this.deaNpi = VerificationStatus.NOT_STARTED;
-        this.education = VerificationStatus.NOT_STARTED;
-        this.malpractice = VerificationStatus.NOT_STARTED;
-        this.workHistory = VerificationStatus.NOT_STARTED;
-        this.sanctions = VerificationStatus.NOT_STARTED;
-        this.overallStatus = OverallStatus.NOT_STARTED;
+        this.licenses = VerificationStatus.PENDING;
+        this.deaNpi = VerificationStatus.PENDING;
+        this.education = VerificationStatus.PENDING;
+        this.malpractice = VerificationStatus.PENDING;
+        this.workHistory = VerificationStatus.PENDING;
+        this.sanctions = VerificationStatus.PENDING;
+        this.overallStatus = OverallStatus.COMPLETED;
     }
 }
 

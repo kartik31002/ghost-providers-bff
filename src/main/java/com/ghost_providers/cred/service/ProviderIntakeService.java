@@ -91,6 +91,9 @@ public class ProviderIntakeService {
 
     public static ProviderPsvStatus getPsvStatus(Provider saved) {
         ProviderPsvStatus psvStatus = new ProviderPsvStatus();
+        if(saved.getId()%2==0) {
+            psvStatus.setWorkHistory(ProviderPsvStatus.VerificationStatus.PENDING);
+        }
         psvStatus.setProvider(saved);
         return psvStatus;
     }

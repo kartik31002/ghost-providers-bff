@@ -11,6 +11,7 @@ import com.ghost_providers.cred.service.DocumentProcessingService;
 import com.ghost_providers.cred.service.FileProcessingService;
 import com.ghost_providers.cred.service.ProviderIntakeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ import java.util.zip.ZipInputStream;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
+@Slf4j
 public class FileUploadController {
     private final FileDocumentRepository repository;
 
@@ -128,6 +130,9 @@ public class FileUploadController {
 
     @PostMapping("/upload/providers")
     public ResponseEntity<?> uploadProviderZip(@RequestParam("file") MultipartFile zipFile) {
+        String baseDir = "./temp";
+        String uniqueFolder = "unzipped_" + System.currentTimeMillis();
+        File extractDir = new File(baseDir, uniqueFolder);
         try {
             if (!zipFile.getOriginalFilename().endsWith(".zip")) {
                 return ResponseEntity.badRequest().body("Only ZIP files are supported.");
@@ -141,19 +146,39 @@ public class FileUploadController {
             Path zipPath = Paths.get(uploadDir, uniqueZipName);
             Files.copy(zipFile.getInputStream(), zipPath, StandardCopyOption.REPLACE_EXISTING);
 
-            // 2. Extract ZIP
-            File extractDir = Files.createTempDirectory("unzipped_").toFile();
+
+            // Step 1: Create custom temp dir
+            if (!extractDir.mkdirs()) {
+                return ResponseEntity.status(500).body("Failed to create temp directory.");
+            }
+
             try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
                 ZipEntry entry;
                 while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) continue; // ✅ Skip folders
+
                     File newFile = new File(extractDir, entry.getName());
+
+                    // Prevent Zip Slip
+                    String destDirPath = extractDir.getCanonicalPath();
+                    String destFilePath = newFile.getCanonicalPath();
+                    if (!destFilePath.startsWith(destDirPath + File.separator)) {
+                        throw new IOException("Entry outside target dir: " + entry.getName());
+                    }
+
+                    // ✅ Ensure parent directory exists
+                    File parent = newFile.getParentFile();
+                    if (!parent.exists() && !parent.mkdirs()) {
+                        throw new IOException("Failed to create directory: " + parent);
+                    }
+
+                    // ✅ Only try to write if it's not a directory
                     try (FileOutputStream fos = new FileOutputStream(newFile)) {
                         zis.transferTo(fos);
                     }
                 }
             }
 
-            // 3. Identify the files inside ZIP
             File[] extractedFiles = extractDir.listFiles();
             if (extractedFiles == null || extractedFiles.length < 4)
                 return ResponseEntity.badRequest().body("ZIP must contain at least 1 CSV and 3 PDFs.");
@@ -195,8 +220,48 @@ public class FileUploadController {
             ));
 
         } catch (Exception e) {
+            log.error("Error", e);
             return ResponseEntity.status(500).body(Map.of("error", "ZIP processing failed", "details", e.getMessage()));
+        } finally {
+            try {
+                deleteDirectoryRecursively(extractDir); // optional cleanup
+            } catch (IOException cleanupEx) {
+                System.err.println("Cleanup failed: " + cleanupEx.getMessage());
+            }
         }
+    }
+
+    private static File[] getExtractedFiles(MultipartFile zipFile, Path extractPath) throws IOException {
+        File extractDir = extractPath.toFile();
+
+        // Safely extract with directory check and mkdirs
+        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                File newFile = new File(extractDir, entry.getName());
+
+                // Prevent zip slip
+                String destDirPath = extractDir.getCanonicalPath();
+                String destFilePath = newFile.getCanonicalPath();
+                if (!destFilePath.startsWith(destDirPath + File.separator)) {
+                    throw new IOException("Zip entry outside target directory: " + entry.getName());
+                }
+
+                // Ensure parent directory exists
+                File parentDir = newFile.getParentFile();
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs();
+                }
+
+                try (FileOutputStream fos = new FileOutputStream(newFile)) {
+                    zis.transferTo(fos);
+                }
+            }
+        }
+
+        // 3. Identify the files inside ZIP
+        File[] extractedFiles = extractDir.listFiles();
+        return extractedFiles;
     }
 
     private File findFileByKeyword(File[] files, String keyword) {
@@ -206,5 +271,18 @@ public class FileUploadController {
                 .orElseThrow(() -> new IllegalArgumentException("Missing PDF file with keyword: " + keyword));
     }
 
+    private void deleteDirectoryRecursively(File dir) throws IOException {
+        if (dir.isDirectory()) {
+            File[] entries = dir.listFiles();
+            if (entries != null) {
+                for (File entry : entries) {
+                    deleteDirectoryRecursively(entry);
+                }
+            }
+        }
+        if (!dir.delete()) {
+            throw new IOException("Failed to delete " + dir.getAbsolutePath());
+        }
+    }
 
 }

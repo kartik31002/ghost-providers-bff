@@ -2,6 +2,7 @@ package com.ghost_providers.cred.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
 
 import java.time.LocalDate;
 
@@ -26,7 +27,13 @@ public class Demographics {
 
     private String ssn;
 
+    @Getter
     public enum Gender {
-        MALE, FEMALE, OTHER, PREFER_NOT_TO_SAY
+        MALE("male"), FEMALE("female"), OTHER("other"), PREFER_NOT_TO_SAY("prefer-not-to-say");
+        private final String label;
+
+        Gender(String label) {
+            this.label = label;
+        }
     }
 }

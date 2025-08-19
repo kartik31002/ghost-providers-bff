@@ -22,6 +22,7 @@ public class ProviderCredential {
     private String medicaidId;
     private String deaNumber;
     private String caqhId;
+    private String insurancePolicyNumber;
 }
 
 

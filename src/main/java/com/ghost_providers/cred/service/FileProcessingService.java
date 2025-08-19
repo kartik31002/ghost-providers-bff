@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -124,10 +126,30 @@ public class FileProcessingService {
             credentialsDto.setNpi(row[map.getOrDefault("npi number", null)]);
             credentialsDto.setTin(row[map.getOrDefault("tin", null)]);
             credentialsDto.setDeaNumber(row[map.getOrDefault("dea number", null)]);
+            credentialsDto.setMedicareId(row[map.getOrDefault("medicaid license", null)]);
+            credentialsDto.setMedicareId(row[map.getOrDefault("medicare license", null)]);
             dto.setCredentials(credentialsDto);
+
+            DemographicsDto demographicsDto = new DemographicsDto();
+            demographicsDto.setDateOfBirth(LocalDate.from(LocalDateTime.now().minusYears(35)));
+            demographicsDto.setSsn(row[map.getOrDefault("ssn", null)]);
+            demographicsDto.setGender(row[map.getOrDefault("gender", null)]);
+            dto.setDemographics(demographicsDto);
+
+            ContactDto contactDto = new ContactDto();
+            contactDto.setAddress(row[map.getOrDefault("address", null)]);
+            contactDto.setCity(row[map.getOrDefault("city", null)]);
+            contactDto.setState(row[map.getOrDefault("state", null)]);
+            contactDto.setZip(row[map.getOrDefault("zip code", null)]);
+            contactDto.setCountry("US");
+            contactDto.setEmail(row[map.getOrDefault("email address", null)]);
+            contactDto.setPhone(row[map.getOrDefault("phone number", null)]);
+            dto.setContactInfo(contactDto);
 
             LicenseDto licenseDto = new LicenseDto();
             licenseDto.setLicenseNumber(row[map.getOrDefault("license number", null)]);
+            licenseDto.setState(row[map.getOrDefault("state", null)]);
+            licenseDto.setExpirationDate(LocalDate.from(LocalDateTime.now().plusMonths(43)));
             licenseDto.setStatus(ProviderLicense.LicenseStatus.PENDING.getLabel());
             dto.setLicenses(List.of(licenseDto));
 

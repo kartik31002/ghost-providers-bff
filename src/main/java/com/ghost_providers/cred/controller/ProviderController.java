@@ -3,9 +3,11 @@ package com.ghost_providers.cred.controller;
 import com.ghost_providers.cred.dto.ProviderDTO;
 import com.ghost_providers.cred.service.ProviderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/providers")
@@ -24,5 +26,8 @@ public class ProviderController {
     public ProviderDTO getProvider(@PathVariable Long id) {
         return providerService.getProvider(id);
     }
+
+    @PostMapping("/update-status/{id}")
+    public ResponseEntity<Map<String,String>> updateStatus (@PathVariable Long id, @RequestParam String status) { return providerService.updateStatus(id, status);}
 }
 
